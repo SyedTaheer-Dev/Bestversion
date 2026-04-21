@@ -33,17 +33,24 @@ app.use(
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-
       return callback(new Error(`CORS blocked for origin: ${origin}`));
     },
     credentials: true,
   })
 );
+
 app.use(cookieParser());
 app.use(express.json());
 
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    message: "Bestversion backend is running",
+    health: "/api/health",
+  });
+});
+
 app.get("/api/health", (_req, res) => {
-  res.json({
+  res.status(200).json({
     status: "ok",
     port,
     allowedOrigins,
@@ -59,8 +66,12 @@ app.use("/api/challenges", challengesRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/admin", adminRoutes);
 
+app.use("/api/*", (_req, res) => {
+  res.status(404).json({ message: "API route not found" });
+});
+
 app.use((err, _req, res, _next) => {
-  console.error(err);
+  console.error("Server error:", err);
   res.status(500).json({ message: err.message || "Internal server error" });
 });
 
@@ -68,8 +79,9 @@ connectDB()
   .then(async () => {
     await ensureAdminUser();
     await ensureKnowledgeBase();
-    app.listen(port, () => {
-      console.log(`Server running on http://localhost:${port}`);
+
+    app.listen(port, "0.0.0.0", () => {
+      console.log(`Server running on port ${port}`);
       console.log(`Allowed frontend origins: ${allowedOrigins.join(", ")}`);
     });
   })
