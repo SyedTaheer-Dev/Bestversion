@@ -18,19 +18,39 @@ dotenv.config();
 const app = express();
 const port = Number(process.env.PORT || 5000);
 
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.CLIENT_URL,
+const normalizeOrigin = (url) => (url ? url.replace(/\/$/, "") : url);
+
+const staticAllowedOrigins = [
+  normalizeOrigin(process.env.FRONTEND_URL),
+  normalizeOrigin(process.env.CLIENT_URL),
   "http://localhost:8081",
   "http://127.0.0.1:8081",
   "http://localhost:8080",
   "http://127.0.0.1:8080",
+  "https://bestversion.vercel.app",
 ].filter(Boolean);
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+
+  const normalizedOrigin = normalizeOrigin(origin);
+
+  if (staticAllowedOrigins.includes(normalizedOrigin)) {
+    return true;
+  }
+
+  // Allow Vercel preview deployments
+  if (/^https:\/\/bestversion.*\.vercel\.app$/.test(normalizedOrigin)) {
+    return true;
+  }
+
+  return false;
+};
 
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
       return callback(new Error(`CORS blocked for origin: ${origin}`));
@@ -53,7 +73,7 @@ app.get("/api/health", (_req, res) => {
   res.status(200).json({
     status: "ok",
     port,
-    allowedOrigins,
+    allowedOrigins: staticAllowedOrigins,
     cookieMode: true,
   });
 });
@@ -82,7 +102,7 @@ connectDB()
 
     app.listen(port, "0.0.0.0", () => {
       console.log(`Server running on port ${port}`);
-      console.log(`Allowed frontend origins: ${allowedOrigins.join(", ")}`);
+      console.log(`Allowed frontend origins: ${staticAllowedOrigins.join(", ")}`);
     });
   })
   .catch((error) => {
