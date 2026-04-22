@@ -13,12 +13,26 @@ type RequestOptions = RequestInit & {
   auth?: boolean;
 };
 
+const getStoredToken = () => {
+  try {
+    return localStorage.getItem("bv_token");
+  } catch {
+    return null;
+  }
+};
+
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers = new Headers(options.headers || {});
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
 
   if (!isFormData && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
+  }
+
+  const token = getStoredToken();
+
+  if (options.auth !== false && token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
   let response: Response;
@@ -31,7 +45,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     });
   } catch {
     throw new ApiError(
-      `Cannot reach backend at ${API_URL}. Start the backend with "npm run server" and make sure MongoDB is running.`,
+      `Cannot reach backend at ${API_URL}. Backend may be down or blocked.`,
       0
     );
   }
