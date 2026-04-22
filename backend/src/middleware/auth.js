@@ -21,6 +21,20 @@ const getTokenFromRequest = (req) => {
   return null;
 };
 
+const getUserFromToken = async (token) => {
+  if (!token) return null;
+
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  const userId = decoded.id || decoded.userId || decoded._id;
+
+  if (!userId) {
+    throw new Error("Invalid token payload");
+  }
+
+  const user = await User.findById(userId).select("-password");
+  return user || null;
+};
+
 export const protect = async (req, res, next) => {
   try {
     const token = getTokenFromRequest(req);
@@ -29,14 +43,7 @@ export const protect = async (req, res, next) => {
       return res.status(401).json({ message: "Not authenticated" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.id || decoded.userId || decoded._id;
-
-    if (!userId) {
-      return res.status(401).json({ message: "Invalid token payload" });
-    }
-
-    const user = await User.findById(userId).select("-password");
+    const user = await getUserFromToken(token);
 
     if (!user) {
       return res.status(401).json({ message: "User not found" });
@@ -47,6 +54,24 @@ export const protect = async (req, res, next) => {
   } catch (error) {
     console.error("Protect middleware error:", error.message);
     return res.status(401).json({ message: "Invalid or expired token" });
+  }
+};
+
+export const optionalAuth = async (req, _res, next) => {
+  try {
+    const token = getTokenFromRequest(req);
+
+    if (!token) {
+      req.user = null;
+      return next();
+    }
+
+    const user = await getUserFromToken(token);
+    req.user = user || null;
+    next();
+  } catch (error) {
+    req.user = null;
+    next();
   }
 };
 
